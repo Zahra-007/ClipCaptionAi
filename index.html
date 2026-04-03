@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ClipCaptionAI — AI Captions for Your Videos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0a0a0f;
+  --surface:#13131a;
+  --surface2:#1c1c26;
+  --border:#ffffff0f;
+  --border2:#ffffff18;
+  --text:#f0f0f8;
+  --muted:#6b6b80;
+  --accent:#7c6aff;
+  --accent2:#a78bfa;
+  --green:#22d3a5;
+  --red:#ff6b6b;
+}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* Background grid */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(124,106,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,106,255,0.03) 1px, transparent 1px);
+  background-size:60px 60px;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* Glow orbs */
+.orb{
+  position:fixed;
+  border-radius:50%;
+  filter:blur(80px);
+  pointer-events:none;
+  z-index:0;
+}
+.orb1{width:500px;height:500px;background:rgba(124,106,255,0.08);top:-100px;right:-100px;}
+.orb2{width:400px;height:400px;background:rgba(34,211,165,0.05);bottom:-100px;left:-100px;}
+
+nav{
+  position:relative;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:24px 40px;
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  font-family:'Syne',sans-serif;
+  font-weight:800;
+  font-size:22px;
+  letter-spacing:-0.5px;
+}
+.logo span{color:var(--accent);}
+.nav-pill{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:100px;
+  padding:8px 20px;
+  font-size:13px;
+  color:var(--muted);
+}
+
+.hero{
+  position:relative;
+  z-index:1;
+  text-align:center;
+  padding:80px 20px 60px;
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:rgba(124,106,255,0.1);
+  border:1px solid rgba(124,106,255,0.25);
+  border-radius:100px;
+  padding:6px 16px;
+  font-size:12px;
+  color:var(--accent2);
+  margin-bottom:28px;
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+}
+.badge-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+h1{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(42px,7vw,80px);
+  font-weight:800;
+  line-height:1.05;
+  letter-spacing:-2px;
+  margin-bottom:20px;
+}
+h1 em{
+  font-style:normal;
+  background:linear-gradient(135deg,var(--accent),var(--accent2),var(--green));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.subtitle{
+  font-size:18px;
+  color:var(--muted);
+  max-width:480px;
+  margin:0 auto 50px;
+  line-height:1.6;
+  font-weight:300;
+}
+
+/* Upload area */
+.upload-card{
+  position:relative;
+  z-index:1;
+  max-width:660px;
+  margin:0 auto;
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:24px;
+  padding:40px;
+  box-shadow:0 40px 80px rgba(0,0,0,0.4);
+}
+
+.drop-zone{
+  border:2px dashed var(--border2);
+  border-radius:16px;
+  padding:48px 24px;
+  text-align:center;
+  cursor:pointer;
+  transition:all 0.2s;
+  position:relative;
+  overflow:hidden;
+}
+.drop-zone:hover,.drop-zone.dragover{
+  border-color:var(--accent);
+  background:rgba(124,106,255,0.04);
+}
+.drop-zone input{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  cursor:pointer;
+  width:100%;
+  height:100%;
+}
+.upload-icon{
+  width:52px;height:52px;
+  background:rgba(124,106,255,0.1);
+  border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 16px;
+}
+.upload-icon svg{width:24px;height:24px;stroke:var(--accent);}
+.drop-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;margin-bottom:6px;}
+.drop-sub{font-size:13px;color:var(--muted);}
+.drop-sub span{color:var(--accent);cursor:pointer;}
+
+/* Options */
+.options{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:24px;
+}
+.option-group label{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:6px;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.option-group select{
+  width:100%;
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:10px 14px;
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  cursor:pointer;
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b80' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+}
+.option-group select:focus{outline:none;border-color:var(--accent);}
+
+.btn-generate{
+  width:100%;
+  margin-top:20px;
+  padding:16px;
+  background:linear-gradient(135deg,var(--accent),#9d8bff);
+  border:none;
+  border-radius:12px;
+  color:#fff;
+  font-family:'Syne',sans-serif;
+  font-weight:700;
+  font-size:16px;
+  cursor:pointer;
+  transition:all 0.2s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn-generate:hover{transform:translateY(-1px);box-shadow:0 8px 30px rgba(124,106,255,0.35);}
+.btn-generate:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+
+/* Progress */
+.progress-wrap{display:none;margin-top:20px;}
+.progress-track{
+  height:4px;
+  background:var(--surface2);
+  border-radius:100px;
+  overflow:hidden;
+  margin-bottom:10px;
+}
+.progress-bar{
+  height:100%;
+  background:linear-gradient(90deg,var(--accent),var(--green));
+  border-radius:100px;
+  width:0%;
+  transition:width 0.4s ease;
+}
+.progress-label{font-size:13px;color:var(--muted);text-align:center;}
+
+/* Result */
+.result-wrap{display:none;margin-top:24px;}
+.result-video{
+  width:100%;
+  border-radius:12px;
+  background:#000;
+  max-height:360px;
+}
+.result-actions{
+  display:flex;
+  gap:10px;
+  margin-top:12px;
+}
+.btn-download{
+  flex:1;
+  padding:13px;
+  background:var(--green);
+  border:none;
+  border-radius:10px;
+  color:#0a0a0f;
+  font-family:'Syne',sans-serif;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.btn-download:hover{opacity:0.9;transform:translateY(-1px);}
+.btn-reset{
+  padding:13px 20px;
+  background:var(--surface2);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  color:var(--muted);
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.btn-reset:hover{color:var(--text);border-color:var(--border);}
+
+.error-msg{
+  display:none;
+  margin-top:14px;
+  padding:12px 16px;
+  background:rgba(255,107,107,0.08);
+  border:1px solid rgba(255,107,107,0.2);
+  border-radius:10px;
+  color:var(--red);
+  font-size:13px;
+  text-align:center;
+}
+
+/* File selected state */
+.file-selected{
+  display:none;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  background:rgba(124,106,255,0.06);
+  border:1px solid rgba(124,106,255,0.2);
+  border-radius:12px;
+  margin-top:16px;
+}
+.file-selected .file-icon{
+  width:36px;height:36px;
+  background:rgba(124,106,255,0.15);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.file-info{flex:1;min-width:0;}
+.file-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.file-size{font-size:12px;color:var(--muted);}
+.file-remove{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  padding:4px;border-radius:6px;display:flex;
+}
+.file-remove:hover{color:var(--red);}
+
+/* Stats bar */
+.stats{
+  position:relative;z-index:1;
+  display:flex;
+  justify-content:center;
+  gap:48px;
+  padding:48px 20px;
+  border-top:1px solid var(--border);
+  margin-top:60px;
+}
+.stat-item{text-align:center;}
+.stat-num{
+  font-family:'Syne',sans-serif;
+  font-size:32px;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.stat-label{font-size:13px;color:var(--muted);margin-top:4px;}
+
+@media(max-width:600px){
+  nav{padding:16px 20px;}
+  .hero{padding:50px 16px 40px;}
+  .upload-card{margin:0 16px;padding:24px;}
+  .options{grid-template-columns:1fr;}
+  .stats{gap:24px;flex-wrap:wrap;}
+}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<nav>
+  <div class="logo">clip<span>caption</span>ai</div>
+  <div class="nav-pill">Free to use</div>
+</nav>
+
+<section class="hero">
+  <div class="badge"><span class="badge-dot"></span>AI-Powered Captions</div>
+  <h1>Captions that make<br/>people <em>stop scrolling</em></h1>
+  <p class="subtitle">Upload your video and get perfectly timed, beautifully styled captions in seconds.</p>
+</section>
+
+<div class="upload-card">
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="video/mp4,video/mov,video/avi,video/webm,video/quicktime"/>
+    <div class="upload-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <div class="drop-title">Drop your video here</div>
+    <div class="drop-sub">MP4, MOV, AVI, WEBM — up to 100MB &nbsp;·&nbsp; <span>browse files</span></div>
+  </div>
+
+  <div class="file-selected" id="fileSelected">
+    <div class="file-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round">
+        <rect x="2" y="2" width="20" height="20" rx="3"/>
+        <polygon points="10,8 16,12 10,16"/>
+      </svg>
+    </div>
+    <div class="file-info">
+      <div class="file-name" id="fileName">video.mp4</div>
+      <div class="file-size" id="fileSize">0 MB</div>
+    </div>
+    <button class="file-remove" onclick="resetFile()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="options">
+    <div class="option-group">
+      <label>Caption style</label>
+      <select id="captionStyle">
+        <option value="white">Classic white</option>
+        <option value="yellow">Bold yellow</option>
+        <option value="outline">Black outline</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label>Font size</label>
+      <select id="fontSize">
+        <option value="small">Small</option>
+        <option value="medium" selected>Medium</option>
+        <option value="large">Large</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn-generate" id="btnGenerate" onclick="generate()" disabled>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    Generate Captions
+  </button>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-label" id="progressLabel">Uploading video...</div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="result-wrap" id="resultWrap">
+    <video class="result-video" id="resultVideo" controls></video>
+    <div class="result-actions">
+      <button class="btn-download" id="btnDownload">Download Video</button>
+      <button class="btn-reset" onclick="resetAll()">New Video</button>
+    </div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat-item"><div class="stat-num">99%</div><div class="stat-label">Accuracy</div></div>
+  <div class="stat-item"><div class="stat-num">30s</div><div class="stat-label">Average time</div></div>
+  <div class="stat-item"><div class="stat-num">Free</div><div class="stat-label">No signup needed</div></div>
+</div>
+
+<script>
+let selectedFile = null;
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  if (file.size > 100 * 1024 * 1024) { showError('File too large. Max 100MB.'); return; }
+  selectedFile = file;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = (file.size / (1024*1024)).toFixed(1) + ' MB';
+  document.getElementById('fileSelected').style.display = 'flex';
+  document.getElementById('btnGenerate').disabled = false;
+  hideError();
+}
+
+function resetFile() {
+  selectedFile = null;
+  fileInput.value = '';
+  document.getElementById('fileSelected').style.display = 'none';
+  document.getElementById('btnGenerate').disabled = true;
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideError() { document.getElementById('errorMsg').style.display = 'none'; }
+
+async function generate() {
+  if (!selectedFile) return;
+  hideError();
+  document.getElementById('btnGenerate').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('resultWrap').style.display = 'none';
+  setProgress(10, 'Uploading video...');
+  try {
+    setProgress(25, 'Uploading to AI servers...');
+    const uploadRes = await fetch('/api/upload', {
+      method: 'POST',
+      body: selectedFile
+    });
+    const { upload_url } = await uploadRes.json();
+    if (!upload_url) { showError('Upload failed.'); resetProgress(); return; }
+    setProgress(50, 'Transcribing speech with AI...');
+    const res = await fetch('/api/caption', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ audio_url: upload_url })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) { showError(data.error || 'Something went wrong.'); resetProgress(); return; }
+    setProgress(65, 'Processing captions...');
+    await pollResult(data.job_id);
+  } catch(e) {
+    showError('Network error. Please try again.');
+    resetProgress();
+  }
+}
+
+async function pollResult(jobId) {
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const res = await fetch(`/api/status/${jobId}`);
+    const data = await res.json();
+
+    if (data.status === 'done') {
+      setProgress(100, 'Done!');
+      setTimeout(() => showResult(data.transcript, data.srt), 500);
+      return;
+    }
+    if (data.status === 'error') { showError(data.error || 'Processing failed.'); resetProgress(); return; }
+    setProgress(50 + i, 'Processing captions...');
+  }
+  showError('Timed out. Please try a shorter video.');
+  resetProgress();
+}
+
+function showResult(transcript, srt) {
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('resultWrap').style.display = 'block';
+  const vid = document.getElementById('resultVideo');
+  vid.style.display = 'none';
+  const resultWrap = document.getElementById('resultWrap');
+  let srtBox = document.getElementById('srtBox');
+  if (!srtBox) {
+    srtBox = document.createElement('div');
+    srtBox.id = 'srtBox';
+    srtBox.style.cssText = 'background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:20px;max-height:300px;overflow-y:auto;font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--text);margin-bottom:12px;';
+    resultWrap.insertBefore(srtBox, resultWrap.firstChild);
+  }
+  srtBox.textContent = srt || transcript?.text || 'No captions generated.';
+  document.getElementById('btnDownload').onclick = () => {
+    const blob = new Blob([srt || ''], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'clipcaptionai-captions.srt';
+    a.click();
+  };
+  document.getElementById('btnDownload').textContent = 'Download SRT File';
+}
+
+function resetProgress() {
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('btnGenerate').disabled = false;
+}
+
+function resetAll() {
+  resetFile();
+  resetProgress();
+  document.getElementById('resultWrap').style.display = 'none';
+  hideError();
+}
+</script>
+</body>
+</html>

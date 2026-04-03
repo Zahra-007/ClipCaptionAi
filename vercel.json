@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "functions": {
+    "api/caption.js": { "maxDuration": 60 },
+    "api/status/[id].js": { "maxDuration": 10 },
+    "api/upload.js": { "maxDuration": 60, "memory": 1024 }
+  },
+  "rewrites": [
+    { "source": "/api/status/:id", "destination": "/api/status/[id]" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

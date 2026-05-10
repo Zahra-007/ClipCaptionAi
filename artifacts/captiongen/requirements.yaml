@@ -1,0 +1,15 @@
+packages:
+  "framer-motion": "For smooth transitions between upload, loading, and result states"
+  "react-dropzone": "For robust drag-and-drop file upload interactions"
+  "lucide-react": "For beautiful, consistent iconography"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility to efficiently merge Tailwind CSS classes in JS without style conflicts"
+
+images:
+  - path: "artifacts/captiongen/public/images/bg-mesh.png"
+    description: "A very subtle, light, minimal abstract gradient mesh background in pale blue, white, and slate colors. High key, low contrast, soft blurred lighting perfect for a modern SaaS landing page background. Clean and airy."
+    aspect_ratio: "16:9"
+
+notes:
+  - Using generated React Query hooks from @workspace/api-client-react
+  - Expecting standard multipart/form-data upload to /api/captions/process

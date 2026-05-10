@@ -1,0 +1,63 @@
+The app is generating captions, but the current subtitle styling looks bad and the layout feels optimized for horizontal videos instead of vertical short-form videos.
+
+Please improve the burned-in caption styling specifically for **vertical 9:16 videos**.
+
+Problems to fix:
+
+1. Captions look ugly and too generic
+2. Text wrapping is not optimized for portrait/vertical videos
+3. Subtitle area feels too wide, like horizontal layout assumptions are being used
+4. Captions need to look more like modern short-video subtitles
+
+Please update the subtitle rendering with these exact styling rules:
+
+**Caption style for vertical videos**
+
+* Large bold font
+* White text
+* Strong black outline/stroke for readability
+* Bottom center placement
+* Safe bottom margin so captions don’t sit too low
+* Max 2 lines visible at once
+* Better line wrapping for narrow portrait videos
+* Center aligned
+* Good spacing between lines
+* Avoid long full-width horizontal subtitle lines
+
+**Vertical video optimization**
+
+* Detect portrait videos automatically
+* Use subtitle settings optimized for 9:16 videos
+* Keep captions within the center-safe width area
+* Make text block narrower so it reads well on vertical video
+* Ensure subtitle placement looks natural for Reels/TikTok/Shorts style videos
+
+**FFmpeg / subtitle rendering goals**
+
+* Improve force_style values for subtitles
+* Increase font size significantly for portrait videos
+* Increase outline thickness
+* Add margin from bottom
+* Keep alignment centered
+* Make wrapped lines shorter for portrait videos
+
+If needed, use different subtitle style settings based on video orientation:
+
+* portrait video style
+* landscape video style
+
+For portrait videos, use a larger font and narrower line width.
+
+Also improve subtitle text formatting before rendering:
+
+* split long transcript lines into shorter subtitle chunks
+* avoid huge sentence blocks
+* keep each subtitle readable
+* ideally 3 to 6 words per line for short-form style
+* do not let one subtitle span too wide across the screen
+
+Do not redesign the full app. Only improve:
+
+1. subtitle styling
+2. portrait video handling
+3. subtitle chunking/wrapping

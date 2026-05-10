@@ -1,0 +1,109 @@
+Build a complete MVP web app called **CaptionGen** using **Python Flask** for the backend and a simple clean frontend in the same project.
+
+Goal:
+Create a website where a user uploads a short video, the app transcribes the speech, generates subtitles, burns the captions directly onto the video, previews the final captioned video, and allows download of both the `.srt` file and the final `.mp4`.
+
+Use this exact product direction:
+
+* product name: **CaptionGen**
+* main headline: **Add Captions to Your Videos in Seconds**
+* subtitle: **Upload your video and get automatic subtitles instantly.**
+* design style: modern, clean, minimal SaaS landing page
+* light background
+* dark heading text
+* blue accent color
+* rounded cards and buttons
+* keep it simple and polished
+
+Tech requirements:
+
+* Use **Flask**
+* Use **open-source Whisper** locally, not cloud API
+* Use **FFmpeg** to extract audio and burn subtitles onto the video
+* Keep all code in a simple beginner-friendly structure
+* Add comments in the code
+* The whole app should be runnable in Replit
+
+Core features:
+
+1. Upload a video file
+2. Validate upload:
+
+   * maximum duration: 60 seconds
+   * reasonable file size limit for short videos, like 100 MB
+3. Extract audio from the uploaded video using FFmpeg
+4. Transcribe audio using Whisper
+5. Generate timed subtitles in `.srt` format
+6. Burn subtitles directly onto the video using FFmpeg
+7. Show the transcript on the page
+8. Show a preview player for the final captioned video
+9. Provide a download button for:
+
+   * the `.srt` file
+   * the final captioned `.mp4`
+10. Add proper loading, success, and error states
+
+Important product behavior:
+
+* This is not just a transcript tool
+* The app must create a **new captioned video file with captions visible on the video**
+* The captions should be burned into the video, not just returned as text
+
+Caption style for MVP:
+
+* bottom center placement
+* bold white text
+* readable on short-form videos
+* black outline or semi-transparent dark background for readability
+* maximum 2 lines at a time
+* simple clean subtitle look
+* no complex animation needed for version 1
+
+Error handling:
+
+* If the uploaded file is too large, show a clear message
+* If the video is longer than 60 seconds, show a clear message
+* If no speech is detected, show a clear message
+* If FFmpeg or Whisper fails, return JSON error messages and show them in the UI
+* Do not parse HTML as JSON in the frontend
+* Add safe response handling
+
+Project structure:
+
+* `app.py` as the main Flask app
+* folders for `uploads` and `outputs`
+* simple frontend using Flask templating or embedded HTML/CSS/JS
+* all necessary routes included
+
+Backend expectations:
+
+* `/` route for the main page
+* `/process` POST route for handling uploads and processing
+* `/download/<filename>` route for serving generated files
+* return JSON from `/process`
+
+Frontend expectations:
+
+* file input
+* generate button
+* loading message while processing
+* transcript display
+* final video preview
+* download buttons
+
+Please generate the full working code for:
+
+* `app.py`
+* any HTML/CSS/JS needed
+* dependency list
+* short run instructions for Replit
+
+Also make sure:
+
+* the app does not require login
+* no payments
+* no dashboard
+* no database needed for MVP
+* use local file storage only
+
+Build the app from scratch as a working MVP, not a mockup.

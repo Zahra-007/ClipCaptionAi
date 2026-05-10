@@ -1,0 +1,162 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: CaptionGen API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: captions
+    description: Caption generation operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /captions/process:
+    post:
+      operationId: processVideo
+      tags: [captions]
+      summary: Process video for captions
+      description: Upload a video, transcribe it, burn captions, return results
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video:
+                  type: string
+                  format: binary
+                  description: The video file to process
+              required:
+                - video
+      responses:
+        "200":
+          description: Successfully processed video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessResult"
+        "400":
+          description: Bad request (file too large, too long, no speech, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResult"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResult"
+
+  /captions/download/{filename}:
+    get:
+      operationId: downloadFile
+      tags: [captions]
+      summary: Download a generated file
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    TranscriptSegment:
+      type: object
+      properties:
+        start:
+          type: number
+          description: Start time in seconds
+        end:
+          type: number
+          description: End time in seconds
+        text:
+          type: string
+          description: Transcript text for this segment
+      required:
+        - start
+        - end
+        - text
+
+    ProcessResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        transcript:
+          type: string
+          description: Full transcript text
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptSegment"
+          description: Timed transcript segments
+        captionedVideoUrl:
+          type: string
+          description: URL to download the captioned video
+        srtUrl:
+          type: string
+          description: URL to download the SRT file
+        captionedVideoFilename:
+          type: string
+        srtFilename:
+          type: string
+      required:
+        - success
+        - transcript
+        - segments
+        - captionedVideoUrl
+        - srtUrl
+        - captionedVideoFilename
+        - srtFilename
+
+    ErrorResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string
+      required:
+        - success
+        - error

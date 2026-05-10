@@ -522,7 +522,7 @@ export default function Home() {
           {/* Footer */}
           <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#9ca3af" }}>
             Powered by{" "}
-            <span style={{ fontWeight: 600, color: "#6b7280" }}>AssemblyAI</span> ×{" "}
+            <span style={{ fontWeight: 600, color: "#6b7280" }}>Groq Whisper</span> ×{" "}
             <span style={{ fontWeight: 600, color: "#6b7280" }}>FFmpeg.wasm</span>
           </p>
         </div>

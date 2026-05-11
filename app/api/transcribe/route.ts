@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/** Convert seconds → SRT timestamp  hh:mm:ss,ms */
-function toSrtTime(seconds: number): string {
-  const ms = Math.round((seconds % 1) * 1000);
-  const totalSec = Math.floor(seconds);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+/** Convert seconds → ASS timestamp h:mm:ss.cc */
+function toAssTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const cs = Math.floor((seconds % 1) * 100);
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
 }
 
 interface GroqWord {
@@ -16,27 +15,41 @@ interface GroqWord {
   end: number;   // seconds
 }
 
-/** Build an SRT string by grouping words into ~6-word caption blocks. */
-function buildSrt(words: GroqWord[]): string {
+/** Build an ASS string with sleek styling and pop animations. */
+function buildAss(words: GroqWord[]): string {
   if (!words || words.length === 0) return "";
 
-  const blocks: { start: number; end: number; text: string }[] = [];
-  const CHUNK = 6;
+  const header = `[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 360
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Roboto Regular,28,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1.5,0,2,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  const CHUNK = 3; // Smaller chunks for sleek look
+  const events: string[] = [];
 
   for (let i = 0; i < words.length; i += CHUNK) {
     const slice = words.slice(i, i + CHUNK);
-    blocks.push({
-      start: slice[0].start,
-      end: slice[slice.length - 1].end,
-      text: slice.map((w) => w.word).join(" "),
-    });
+    const start = slice[0].start;
+    const end = slice[slice.length - 1].end;
+    const text = slice.map((w) => w.word).join(" ");
+    
+    // Add a subtle pop animation using ASS tags: {\fscx110\fscy110\t(0,150,\fscx100\fscy100)}
+    const animatedText = `{\\fscx115\\fscy115\\t(0,120,\\fscx100\\fscy100)}${text}`;
+    
+    events.push(
+      `Dialogue: 0,${toAssTime(start)},${toAssTime(end)},Default,,0,0,0,,${animatedText}`
+    );
   }
 
-  return blocks
-    .map((b, idx) =>
-      `${idx + 1}\n${toSrtTime(b.start)} --> ${toSrtTime(b.end)}\n${b.text}`
-    )
-    .join("\n\n");
+  return header + events.join("\n");
 }
 
 export async function POST(req: NextRequest) {
@@ -98,12 +111,13 @@ export async function POST(req: NextRequest) {
       confidence: 1,
     }));
 
-    const srt = buildSrt(rawWords);
+    const ass = buildAss(rawWords);
+    const srt = ""; // Keeping for compatibility or later use
 
     return NextResponse.json({
       text: result.text ?? "",
       words,
-      srt,
+      ass,
     });
   } catch (error: any) {
     console.error("Transcription error:", error);

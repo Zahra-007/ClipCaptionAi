@@ -68,7 +68,7 @@ export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>("");
   const [outputVideoUrl, setOutputVideoUrl] = useState<string>("");
-  const [srtContent, setSrtContent] = useState<string>("");
+  const [assContent, setAssContent] = useState<string>("");
   const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string>("");
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
@@ -202,21 +202,23 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setSrtContent(data.srt || "");
+      setAssContent(data.ass || "");
       const entries = buildTranscriptEntries(data.words || []);
       setTranscriptEntries(entries);
 
       // Step 3: Burn captions
       setStep("burning");
+      setLoadingProgress(0);
 
-      // Write SRT file for ffmpeg
-      const srtBytes = new TextEncoder().encode(data.srt || "");
-      await ffmpeg.writeFile("captions.srt", srtBytes);
+      // Write ASS file for ffmpeg
+      const assBytes = new TextEncoder().encode(data.ass || "");
+      await ffmpeg.writeFile("captions.ass", assBytes);
 
       // Burn captions into video
+      // Using .ass allows for advanced styling and animations defined in the file
       await ffmpeg.exec([
         "-i", "input.mp4",
-        "-vf", "subtitles=captions.srt:fontsdir=/:force_style='FontName=Roboto Regular,FontSize=24,PrimaryColour=&HFFFFFF&,OutlineColour=&H40000000&,Outline=2,Shadow=1,Alignment=2'",
+        "-vf", "subtitles=captions.ass:fontsdir=/",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "28",
@@ -232,7 +234,7 @@ export default function Home() {
       // Cleanup ffmpeg files
       await ffmpeg.deleteFile("input.mp4").catch(() => {});
       await ffmpeg.deleteFile("audio.wav").catch(() => {});
-      await ffmpeg.deleteFile("captions.srt").catch(() => {});
+      await ffmpeg.deleteFile("captions.ass").catch(() => {});
       await ffmpeg.deleteFile("output.mp4").catch(() => {});
 
       setStep("done");
@@ -248,18 +250,18 @@ export default function Home() {
     setVideoFile(null);
     setVideoPreviewUrl("");
     setOutputVideoUrl("");
-    setSrtContent("");
+    setAssContent("");
     setTranscriptEntries([]);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDownloadSrt = () => {
-    const blob = new Blob([srtContent], { type: "text/plain" });
+  const handleDownloadAss = () => {
+    const blob = new Blob([assContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "captions.srt";
+    a.download = "captions.ass";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -431,9 +433,9 @@ export default function Home() {
                   <Download size={17} />
                   Download Video
                 </a>
-                <button onClick={handleDownloadSrt} className="btn-outline">
+                <button onClick={handleDownloadAss} className="btn-outline">
                   <Download size={17} />
-                  Download .SRT Subtitles
+                  Download .ASS Subtitles
                 </button>
 
                 {/* Transcript */}

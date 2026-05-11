@@ -72,6 +72,7 @@ export default function Home() {
   const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string>("");
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<FFmpeg | null>(null);
@@ -79,13 +80,29 @@ export default function Home() {
   // Pre-load FFmpeg
   useEffect(() => {
     const loadFfmpeg = async () => {
+      if (ffmpegRef.current) return;
       try {
         const ffmpeg = new FFmpeg();
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
+        
+        ffmpeg.on("log", ({ message }) => {
+          console.log("FFmpeg Log:", message);
+        });
+
+        ffmpeg.on("progress", ({ progress }) => {
+          setLoadingProgress(Math.round(progress * 100));
+        });
+
         await ffmpeg.load({
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
         });
+
+        // Load a font for captions (Roboto)
+        const fontUrl = "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Regular.ttf";
+        const fontData = await fetchFile(fontUrl);
+        await ffmpeg.writeFile("Roboto-Regular.ttf", fontData);
+
         ffmpegRef.current = ffmpeg;
         setFfmpegLoaded(true);
       } catch (e) {
@@ -145,11 +162,16 @@ export default function Home() {
       let ffmpeg = ffmpegRef.current;
       if (!ffmpeg) {
         const newFfmpeg = new FFmpeg();
-        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+        const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
         await newFfmpeg.load({
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
         });
+        // Load font if not already there
+        const fontUrl = "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Regular.ttf";
+        const fontData = await fetchFile(fontUrl);
+        await newFfmpeg.writeFile("Roboto-Regular.ttf", fontData);
+        
         ffmpegRef.current = newFfmpeg;
         ffmpeg = newFfmpeg;
       }
@@ -194,10 +216,10 @@ export default function Home() {
       // Burn captions into video
       await ffmpeg.exec([
         "-i", "input.mp4",
-        "-vf", "subtitles=captions.srt:force_style='FontName=Arial,FontSize=22,PrimaryColour=&HFFFFFF&,OutlineColour=&H40000000&,Outline=2,Shadow=1,Alignment=2'",
+        "-vf", "subtitles=captions.srt:fontsdir=/:force_style='FontName=Roboto Regular,FontSize=24,PrimaryColour=&HFFFFFF&,OutlineColour=&H40000000&,Outline=2,Shadow=1,Alignment=2'",
         "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
+        "-preset", "ultrafast",
+        "-crf", "28",
         "-c:a", "copy",
         "output.mp4",
       ]);
@@ -351,7 +373,12 @@ export default function Home() {
                         <div className={`step-icon ${state}`}>{icon}</div>
                         <span className={`step-text ${state}`}>{label}</span>
                         {state === "active" && (
-                          <div className="spinner" style={{ marginLeft: "auto" }} />
+                          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px" }}>
+                            {id === "burning" && loadingProgress > 0 && (
+                              <span style={{ fontSize: "0.75rem", color: "#4f7cff", fontWeight: 600 }}>{loadingProgress}%</span>
+                            )}
+                            <div className="spinner" />
+                          </div>
                         )}
                         {state === "completed" && (
                           <CheckCircle2

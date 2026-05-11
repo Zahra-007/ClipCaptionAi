@@ -11,6 +11,10 @@ import {
   Download,
   RotateCcw,
   Film,
+  Type,
+  Palette,
+  Maximize2,
+  MessageSquare,
 } from "lucide-react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
@@ -36,6 +40,101 @@ function formatTime(ms: number): string {
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return `${min}:${String(sec).padStart(2, "0")}`;
+}
+
+function toSrtTime(ms: number): string {
+  const totalSeconds = ms / 1000;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  const msPart = Math.floor((totalSeconds % 1) * 1000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(msPart).padStart(3, "0")}`;
+}
+
+function buildSrtContent(words: WordTimestamp[], mode: "punchy" | "sentence") {
+  if (!words || words.length === 0) return "";
+  let srt = "";
+  let currentGroup: WordTimestamp[] = [];
+  let index = 1;
+
+  words.forEach((word, i) => {
+    currentGroup.push(word);
+    const isLast = i === words.length - 1;
+    const isPunctuation = /[.!?]/.test(word.text);
+    const isPunchyBreak = mode === "punchy" && currentGroup.length >= 3;
+    const isSentenceBreak = mode === "sentence" && isPunctuation;
+
+    if (isLast || isPunchyBreak || isSentenceBreak || currentGroup.length >= 8) {
+      const start = currentGroup[0].start;
+      const end = currentGroup[currentGroup.length - 1].end;
+      const text = currentGroup.map(w => w.text).join(" ");
+      srt += `${index}\n${toSrtTime(start)} --> ${toSrtTime(end)}\n${text}\n\n`;
+      index++;
+      currentGroup = [];
+    }
+  });
+  return srt;
+}
+
+function toAssTime(ms: number): string {
+  const seconds = ms / 1000;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const cs = Math.floor((seconds % 1) * 100);
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+}
+
+function buildAssContent(words: WordTimestamp[]) {
+  if (!words || words.length === 0) return "";
+
+  const header = `[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 360
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Roboto Black,28,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,1.5,0,2,10,10,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  const events: string[] = [];
+  let currentGroup: WordTimestamp[] = [];
+
+  words.forEach((word, i) => {
+    currentGroup.push(word);
+    const isLast = i === words.length - 1;
+    const isEndOfSentence = /[.!?]$/.test(word.text);
+    const isChunkFull = currentGroup.length >= 3; // Punchy style: 2-3 words
+
+    if (isLast || isEndOfSentence || isChunkFull) {
+      const start = currentGroup[0].start;
+      let end = currentGroup[currentGroup.length - 1].end;
+
+      // Timing fix: Ensure clear break before next caption
+      if (!isLast) {
+        const nextStart = words[i + 1].start;
+        // Cap end time at 100ms before next start to ensure visual clear
+        if (end >= nextStart - 100) {
+          end = nextStart - 100; 
+        }
+      }
+
+      const text = currentGroup.map((w) => w.text).join(" ");
+      // Standard text (removed animation for compatibility)
+      const formattedText = text;
+
+      events.push(
+        `Dialogue: 0,${toAssTime(start)},${toAssTime(end)},Default,,0,0,0,,${formattedText}`
+      );
+      currentGroup = [];
+    }
+  });
+
+  return header + events.join("\n");
 }
 
 function buildTranscriptEntries(words: WordTimestamp[]): TranscriptEntry[] {
@@ -72,41 +171,47 @@ export default function Home() {
   const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string>("");
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [rawWords, setRawWords] = useState<WordTimestamp[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<FFmpeg | null>(null);
 
-  // Pre-load FFmpeg
+  // Pre-load FFmpeg and Fonts
   useEffect(() => {
     const loadFfmpeg = async () => {
       if (ffmpegRef.current) return;
       try {
         const ffmpeg = new FFmpeg();
         const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd";
-        
-        ffmpeg.on("log", ({ message }) => {
-          console.log("FFmpeg Log:", message);
-        });
 
-        ffmpeg.on("progress", ({ progress }) => {
-          setLoadingProgress(Math.round(progress * 100));
-        });
+        ffmpeg.on("log", ({ message }) => console.log(message));
+        ffmpeg.on("progress", ({ progress }) => setLoadingProgress(Math.round(progress * 100)));
 
         await ffmpeg.load({
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
         });
 
-        // Load a font for captions (Roboto)
-        const fontUrl = "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Regular.ttf";
-        const fontData = await fetchFile(fontUrl);
-        await ffmpeg.writeFile("Roboto-Regular.ttf", fontData);
+        const fontAssets = [
+          { name: "Roboto-Black.ttf", url: "https://github.com/google/fonts/raw/main/apache/roboto/static/Roboto-Black.ttf" },
+          { name: "Montserrat-Bold.ttf", url: "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf" },
+          { name: "OpenSans-SemiBold.ttf", url: "https://github.com/google/fonts/raw/main/ofl/opensans/OpenSans-SemiBold.ttf" },
+          { name: "PlayfairDisplay-Bold.ttf", url: "https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay-Bold.ttf" }
+        ];
+
+        for (const font of fontAssets) {
+          try {
+            const data = await fetchFile(font.url);
+            await ffmpeg.writeFile(font.name, data);
+          } catch (e) {
+            console.warn(`Failed to load font ${font.name}:`, e);
+          }
+        }
 
         ffmpegRef.current = ffmpeg;
         setFfmpegLoaded(true);
       } catch (e) {
-        console.warn("FFmpeg pre-load failed:", e);
+        console.warn("FFmpeg load failed:", e);
       }
     };
     loadFfmpeg();
@@ -158,7 +263,6 @@ export default function Home() {
     setStep("extracting");
 
     try {
-      // Step 1: Extract audio using FFmpeg
       let ffmpeg = ffmpegRef.current;
       if (!ffmpeg) {
         const newFfmpeg = new FFmpeg();
@@ -167,26 +271,18 @@ export default function Home() {
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
         });
-        // Load font if not already there
-        const fontUrl = "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Regular.ttf";
-        const fontData = await fetchFile(fontUrl);
-        await newFfmpeg.writeFile("Roboto-Regular.ttf", fontData);
-        
         ffmpegRef.current = newFfmpeg;
         ffmpeg = newFfmpeg;
       }
 
-      // Write input video
       const inputData = await fetchFile(videoFile);
       await ffmpeg.writeFile("input.mp4", inputData);
 
-      // Extract audio as WAV
       await ffmpeg.exec(["-i", "input.mp4", "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", "audio.wav"]);
       const audioData = await ffmpeg.readFile("audio.wav");
       const audioBlob = new Blob([audioData], { type: "audio/wav" });
       const audioFile = new File([audioBlob], "audio.wav", { type: "audio/wav" });
 
-      // Step 2: Transcribe
       setStep("transcribing");
       const formData = new FormData();
       formData.append("file", audioFile);
@@ -202,20 +298,20 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setAssContent(data.ass || "");
+      setRawWords(data.words || []);
+
+      const ass = buildAssContent(data.words || []);
+      setAssContent(ass);
+
       const entries = buildTranscriptEntries(data.words || []);
       setTranscriptEntries(entries);
 
-      // Step 3: Burn captions
       setStep("burning");
       setLoadingProgress(0);
 
-      // Write ASS file for ffmpeg
-      const assBytes = new TextEncoder().encode(data.ass || "");
+      const assBytes = new TextEncoder().encode(ass);
       await ffmpeg.writeFile("captions.ass", assBytes);
 
-      // Burn captions into video
-      // Using .ass allows for advanced styling and animations defined in the file
       await ffmpeg.exec([
         "-i", "input.mp4",
         "-vf", "subtitles=captions.ass:fontsdir=/",
@@ -231,11 +327,8 @@ export default function Home() {
       const outputUrl = URL.createObjectURL(outputBlob);
       setOutputVideoUrl(outputUrl);
 
-      // Cleanup ffmpeg files
-      await ffmpeg.deleteFile("input.mp4").catch(() => {});
-      await ffmpeg.deleteFile("audio.wav").catch(() => {});
-      await ffmpeg.deleteFile("captions.ass").catch(() => {});
-      await ffmpeg.deleteFile("output.mp4").catch(() => {});
+      await ffmpeg.deleteFile("audio.wav").catch(() => { });
+      await ffmpeg.deleteFile("output.mp4").catch(() => { });
 
       setStep("done");
     } catch (err: any) {
@@ -245,23 +338,32 @@ export default function Home() {
     }
   };
 
-  const handleReset = () => {
+  // FIX: handleReset is now async
+  const handleReset = async () => {
     setStep("idle");
     setVideoFile(null);
     setVideoPreviewUrl("");
     setOutputVideoUrl("");
     setAssContent("");
     setTranscriptEntries([]);
+    setRawWords([]);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    const ffmpeg = ffmpegRef.current;
+    if (ffmpeg) {
+      await ffmpeg.deleteFile("input.mp4").catch(() => { });
+      await ffmpeg.deleteFile("captions.ass").catch(() => { });
+    }
   };
 
-  const handleDownloadAss = () => {
-    const blob = new Blob([assContent], { type: "text/plain" });
+  const handleDownloadSrt = () => {
+    const srt = buildSrtContent(rawWords, "punchy");
+    const blob = new Blob([srt], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "captions.ass";
+    a.download = "captions.srt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -278,21 +380,9 @@ export default function Home() {
   };
 
   const steps: { id: Step; label: string; icon: React.ReactNode }[] = [
-    {
-      id: "extracting",
-      label: "Extracting audio track...",
-      icon: <AudioLines size={18} />,
-    },
-    {
-      id: "transcribing",
-      label: "Transcribing with AI Whisper...",
-      icon: <Sparkles size={18} />,
-    },
-    {
-      id: "burning",
-      label: "Burning captions into video...",
-      icon: <FileText size={18} />,
-    },
+    { id: "extracting", label: "Extracting audio track...", icon: <AudioLines size={18} /> },
+    { id: "transcribing", label: "Transcribing with AI Whisper...", icon: <Sparkles size={18} /> },
+    { id: "burning", label: "Burning captions into video...", icon: <FileText size={18} /> },
   ];
 
   const isProcessing = step === "extracting" || step === "transcribing" || step === "burning";
@@ -331,21 +421,14 @@ export default function Home() {
                 Videos in Seconds
               </span>
             </h1>
-            <p
-              style={{
-                fontSize: "1.05rem",
-                color: "#6b7280",
-                maxWidth: "480px",
-                margin: "0 auto",
-                lineHeight: 1.6,
-              }}
-            >
+            <p style={{ fontSize: "1.05rem", color: "#6b7280", maxWidth: "480px", margin: "0 auto", lineHeight: 1.6 }}>
               Upload your video and our advanced AI will instantly transcribe the speech and burn beautiful subtitles into it.
             </p>
           </div>
 
           {/* Main Card */}
           <div className="card" style={{ marginBottom: "1.25rem" }}>
+
             {/* Processing State */}
             {isProcessing && (
               <div style={{ textAlign: "center" }}>
@@ -354,14 +437,7 @@ export default function Home() {
                     <Sparkles size={30} />
                   </div>
                 </div>
-                <h2
-                  style={{
-                    fontSize: "1.65rem",
-                    fontWeight: 800,
-                    letterSpacing: "-0.02em",
-                    marginBottom: "0.5rem",
-                  }}
-                >
+                <h2 style={{ fontSize: "1.65rem", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: "0.5rem" }}>
                   Generating Captions
                 </h2>
                 <p style={{ color: "#6b7280", fontSize: "0.95rem", marginBottom: "2rem" }}>
@@ -383,10 +459,7 @@ export default function Home() {
                           </div>
                         )}
                         {state === "completed" && (
-                          <CheckCircle2
-                            size={18}
-                            style={{ marginLeft: "auto", color: "#10b981" }}
-                          />
+                          <CheckCircle2 size={18} style={{ marginLeft: "auto", color: "#10b981" }} />
                         )}
                       </div>
                     );
@@ -403,19 +476,11 @@ export default function Home() {
                   <div className="success-banner-top">
                     <CheckCircle2 size={24} className="success-icon" />
                     <div>
-                      <p style={{ fontWeight: 700, fontSize: "1rem", color: "#065f46" }}>
-                        Captions generated successfully!
-                      </p>
-                      <p style={{ fontSize: "0.875rem", color: "#047857" }}>
-                        Your video is ready to download.
-                      </p>
+                      <p style={{ fontWeight: 700, fontSize: "1rem", color: "#065f46" }}>Captions generated successfully!</p>
+                      <p style={{ fontSize: "0.875rem", color: "#047857" }}>Your video is ready to download.</p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleReset}
-                    className="btn-outline"
-                    style={{ width: "auto", fontSize: "0.875rem", padding: "0.6rem 1.25rem" }}
-                  >
+                  <button onClick={handleReset} className="btn-outline" style={{ width: "auto", fontSize: "0.875rem", padding: "0.6rem 1.25rem" }}>
                     <RotateCcw size={15} />
                     Process Another Video
                   </button>
@@ -429,14 +494,16 @@ export default function Home() {
                 )}
 
                 {/* Download buttons */}
-                <a href={outputVideoUrl} download="captioned-video.mp4" className="btn-download">
-                  <Download size={17} />
-                  Download Video
-                </a>
-                <button onClick={handleDownloadAss} className="btn-outline">
-                  <Download size={17} />
-                  Download .ASS Subtitles
-                </button>
+                <div style={{ display: "flex", gap: "0.75rem" }}>
+                  <a href={outputVideoUrl} download="captioned-video.mp4" className="btn-download">
+                    <Download size={17} />
+                    Download Video
+                  </a>
+                  <button onClick={handleDownloadSrt} className="btn-outline" style={{ width: "auto" }}>
+                    <Download size={17} />
+                    Download SRT
+                  </button>
+                </div>
 
                 {/* Transcript */}
                 {transcriptEntries.length > 0 && (
@@ -482,38 +549,14 @@ export default function Home() {
                   </div>
                   {videoFile ? (
                     <div>
-                      <p
-                        style={{
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                          marginBottom: "0.25rem",
-                          color: "#4f7cff",
-                        }}
-                      >
-                        {videoFile.name}
-                      </p>
-                      <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-                        {(videoFile.size / 1024 / 1024).toFixed(1)} MB · Click to change
-                      </p>
+                      <p style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.25rem", color: "#4f7cff" }}>{videoFile.name}</p>
+                      <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>{(videoFile.size / 1024 / 1024).toFixed(1)} MB · Click to change</p>
                     </div>
                   ) : (
                     <div>
-                      <p style={{ fontWeight: 700, fontSize: "1.05rem", marginBottom: "0.35rem" }}>
-                        Click or drag video to upload
-                      </p>
-                      <p style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "1rem" }}>
-                        MP4, MOV, AVI, WEBM up to 100MB
-                      </p>
-                      <p
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "0.375rem",
-                          fontSize: "0.8rem",
-                          color: "#9ca3af",
-                        }}
-                      >
+                      <p style={{ fontWeight: 700, fontSize: "1.05rem", marginBottom: "0.35rem" }}>Click or drag video to upload</p>
+                      <p style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "1rem" }}>MP4, MOV, AVI, WEBM up to 100MB</p>
+                      <p style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", fontSize: "0.8rem", color: "#9ca3af" }}>
                         <Film size={14} /> Max 60 seconds recommended
                       </p>
                     </div>
@@ -521,26 +564,12 @@ export default function Home() {
                 </div>
 
                 {error && (
-                  <div
-                    style={{
-                      background: "#fef2f2",
-                      border: "1.5px solid #fca5a5",
-                      borderRadius: "12px",
-                      padding: "0.875rem 1rem",
-                      fontSize: "0.875rem",
-                      color: "#dc2626",
-                    }}
-                  >
+                  <div style={{ background: "#fef2f2", border: "1.5px solid #fca5a5", borderRadius: "12px", padding: "0.875rem 1rem", fontSize: "0.875rem", color: "#dc2626" }}>
                     {error}
                   </div>
                 )}
 
-                <button
-                  id="generate-captions-btn"
-                  className="btn-gradient"
-                  onClick={handleGenerate}
-                  disabled={!videoFile}
-                >
+                <button id="generate-captions-btn" className="btn-gradient" onClick={handleGenerate} disabled={!videoFile}>
                   <Sparkles size={18} />
                   Generate Captions
                 </button>
@@ -550,9 +579,7 @@ export default function Home() {
 
           {/* Footer */}
           <p style={{ textAlign: "center", fontSize: "0.8rem", color: "#9ca3af" }}>
-            Powered by{" "}
-            <span style={{ fontWeight: 600, color: "#6b7280" }}>Groq Whisper</span> ×{" "}
-            <span style={{ fontWeight: 600, color: "#6b7280" }}>FFmpeg.wasm</span>
+            Powered by <span style={{ fontWeight: 600, color: "#6b7280" }}>Groq Whisper</span> × <span style={{ fontWeight: 600, color: "#6b7280" }}>FFmpeg.wasm</span>
           </p>
         </div>
       </div>

@@ -406,16 +406,152 @@ html, body {
   background: #000;
 }
 
-/* Responsive */
-@media (max-width: 600px) {
-  .card {
-    padding: 1.25rem;
-    border-radius: 16px;
-  }
-  .drop-zone {
-    padding: 2rem 1.25rem;
-  }
-  .hero-title {
-    font-size: 2rem !important;
+/* Caption Options UI */
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: #f8f9ff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.option-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.select-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.select-pill {
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+  text-align: center;
+}
+
+.select-pill:hover {
+  border-color: #4f7cff;
+  color: #4f7cff;
+}
+
+.select-pill.active {
+  background: #4f7cff;
+  border-color: #4f7cff;
+  color: white;
+}
+
+/* Color Swatches */
+.color-swatch-group {
+  display: flex;
+  gap: 1rem;
+}
+
+.color-swatch {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px #e5e7eb;
+  cursor: pointer;
+  transition: transform 0.2s;
+  position: relative;
+}
+
+.color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.color-swatch.active::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #000;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.color-swatch.White.active::after { color: #000; }
+.color-swatch.Yellow.active::after { color: #000; }
+.color-swatch.Green.active::after { color: #000; }
+
+/* Toggle */
+.toggle-group {
+  display: flex;
+  background: #e5e7eb;
+  padding: 0.25rem;
+  border-radius: 10px;
+  width: fit-content;
+}
+
+.toggle-item {
+  padding: 0.4rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+}
+
+.toggle-item.active {
+  background: white;
+  color: #0f1117;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  outline: none;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #4f7cff;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 500px) {
+  .options-grid {
+    grid-template-columns: 1fr;
   }
 }
